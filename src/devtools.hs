@@ -2,24 +2,43 @@ import Control.Monad
 import Control.Monad.Trans
 import Prelude hiding (lookup)
 import Data.List hiding (lookup)
+import Data.Maybe
 import System.Directory
 import System.Environment
+
+data Tree a = Node a | Fork a [Tree a] deriving (Show)
 
 main = do 
         args <- getArgs
         res <- recurseDirs $ head args
         print res
+        print $ srcMainJava res
 
-recurseDirs :: FilePath -> IO [FilePath]
-recurseDirs d = do
-                 dirs <- listDirs d
-                 subdirs <- mapM recurseDirs dirs
-                 return $ dirs ++ foldl (++) [] subdirs
+extract (Node a)   = a
+extract (Fork a _) = a
+
+srcMainJava :: Tree String -> Maybe (Tree String)
+srcMainJava (Node "./src/main/java") = Just (Node "./src/main/java")
+srcMainJava (Fork "./src/main/java" [ts]) = Just (Fork "./src/main/java" [ts])
+srcMainJava (Fork _ [ts]) = case (catMaybes $ map srcMainJava [ts]) of
+                                [] -> Nothing
+                                (x:xs) -> Just x
+srcMainJava _ = Nothing
+
+recurseDirs :: FilePath -> IO (Tree FilePath)
+recurseDirs p = do
+                 dirs <- listDirs p
+                 subtrees <- mapM recurseDirs dirs
+                 case subtrees of
+                   [] -> return $ Node p
+                   _  -> return $ Fork p subtrees
+
+pruneDirs = [".", "..", ".git"]
 
 listDirs :: FilePath -> IO [FilePath]
 listDirs d = do 
               files <- getDirectoryContents d
-              let pruned = delete "." $ delete ".." files
+              let pruned = filter (\x -> not (elem x pruneDirs)) files
               let paths = map ((d ++ "/") ++) pruned
               dirs <- filterM doesDirectoryExist paths
               return dirs
