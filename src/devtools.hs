@@ -18,8 +18,7 @@ extract (Node a)   = a
 extract (Fork a _) = a
 
 srcMainJava :: Tree String -> Maybe (Tree String)
-srcMainJava (Node "./src/main/java") = Just (Node "./src/main/java")
-srcMainJava (Fork "./src/main/java" [ts]) = Just (Fork "./src/main/java" [ts])
+srcMainJava smj@(Fork "src" [(Fork "main" ((Fork "java" [ts1]):ts2))]) = Just smj
 srcMainJava (Fork _ [ts]) = case (catMaybes $ map srcMainJava [ts]) of
                                 [] -> Nothing
                                 (x:xs) -> Just x
@@ -35,11 +34,12 @@ recurseDirs p = do
 
 pruneDirs = [".", "..", ".git"]
 
-listDirs :: FilePath -> IO [FilePath]
+listDirs :: Tree FilePath -> IO [FilePath]
 listDirs d = do 
               files <- getDirectoryContents d
               let pruned = filter (\x -> not (elem x pruneDirs)) files
-              let paths = map ((d ++ "/") ++) pruned
+              --let paths = map ((d ++ "/") ++) pruned
+              let paths = pruned
               dirs <- filterM doesDirectoryExist paths
               return dirs
 
